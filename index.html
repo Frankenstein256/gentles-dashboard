@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17231C">
+<title>Kitchen Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--paper:#EEF1EC;--card:#fff;--ink:#17231C;--mute:#5C6B61;--line:#D5DBD3;--red:#A82A1C;--leaf:#2F6B4F;--gold:#E3B23C;--blue:#2B5A86}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:72px}
+h1,h2,h3{font-family:"Bricolage Grotesque",system-ui,sans-serif;margin:0;letter-spacing:-.01em}
+header{background:var(--ink);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5}
+header h1{font-size:19px}
+header small{color:#B9C7BD;display:block;font:12px system-ui}
+main{max-width:760px;margin:0 auto;padding:14px}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav button{flex:1;border:0;background:none;padding:13px 2px;font:600 13px system-ui;color:var(--mute)}
+nav button.on{color:var(--red);box-shadow:inset 0 3px 0 var(--red)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.ticket{border-left:6px solid var(--gold)}
+.ticket.completed{border-left-color:var(--leaf)}.ticket.cancelled{border-left-color:#999}
+.ticket.out_for_delivery{border-left-color:var(--blue)}.ticket.pending{border-left-color:var(--red)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.stat b{display:block;font:700 26px "Bricolage Grotesque",system-ui}.stat span{color:var(--mute);font-size:13px}
+.stat.hot b{color:var(--red)}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.mute{color:var(--mute);font-size:13px}
+.pill{display:inline-block;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:600;background:#E4E9E2}
+.pill.human{background:#F7D9D4;color:var(--red)}.pill.ai{background:#DCEBE2;color:var(--leaf)}
+input,textarea,select{width:100%;font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+textarea{min-height:76px;resize:vertical}
+label{display:block;font-size:13px;color:var(--mute);margin:8px 0 3px}
+label.chk{display:flex;gap:8px;align-items:center;color:var(--ink)}label.chk input{width:auto}
+.btn{border:0;border-radius:8px;padding:9px 14px;font:600 14px system-ui;background:var(--ink);color:#fff}
+.btn.red{background:var(--red)}.btn.ghost{background:#E4E9E2;color:var(--ink)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+.bubbles{display:flex;flex-direction:column;gap:6px;margin:10px 0;max-height:52vh;overflow:auto}
+.b{max-width:82%;padding:8px 11px;border-radius:12px;white-space:pre-wrap;word-break:break-word;background:#fff;border:1px solid var(--line)}
+.b.customer{align-self:flex-start}.b.ai{align-self:flex-end;background:#DCEBE2;border-color:#C5DDCE}
+.b.staff{align-self:flex-end;background:#FBEBC4;border-color:#F0DBA0}
+.b small{display:block;color:var(--mute);font-size:11px;margin-top:2px}
+.login{max-width:360px;margin:12vh auto;padding:0 16px}
+.err{color:var(--red);font-size:13px;min-height:18px}
+h2{font-size:20px;margin:6px 0 10px}h3{font-size:16px;margin:16px 0 8px}
+.empty{text-align:center;color:var(--mute);padding:26px 10px}
+@media (prefers-reduced-motion:no-preference){.card{transition:box-shadow .15s}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ====== CONFIG: paste your Supabase values (Project Settings -> API). The anon key is public by design; RLS protects data. ======
+const SUPABASE_URL = "https://qmotfpiquraoqgfvnpsq.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_dH5VKQqZmPm47DleLd5UDQ_VC8VORQ2";
+// ==========================================================================================================================
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let BID = null, BNAME = "", CUR = "GHS", tab = "home", timer = null;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (n) => `${CUR} ${Number(n || 0).toFixed(2)}`;
+const when = (d) => new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+const ORDER_STATUS = ["pending", "confirmed", "preparing", "out_for_delivery", "completed", "cancelled"];
+const label = (s) => s.replace(/_/g, " ");
+
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return loginView();
+  const { data: st } = await sb.from("staff").select("business_id,businesses(name)").limit(1);
+  if (!st || !st.length) {
+    $("#app").innerHTML = `<div class="login"><h2>No business linked</h2><p class="mute">This account is not staff of any business yet. Ask AGP to add you.</p><button class="btn" onclick="logout()">Sign out</button></div>`;
+    return;
+  }
+  BID = st[0].business_id; BNAME = st[0].businesses?.name ?? "";
+  const { data: s } = await sb.from("business_settings").select("currency").eq("business_id", BID).maybeSingle();
+  CUR = s?.currency ?? "GHS";
+  shell(); show("home");
+}
+function loginView() {
+  $("#app").innerHTML = `<div class="login"><h2>Kitchen Desk</h2><p class="mute">Sign in with your staff account.</p>
+  <label>Email<input id="em" type="email" autocomplete="username"></label>
+  <label>Password<input id="pw" type="password" autocomplete="current-password"></label>
+  <p class="err" id="lerr"></p><button class="btn red" id="lgo">Sign in</button></div>`;
+  $("#lgo").onclick = async () => {
+    const { error } = await sb.auth.signInWithPassword({ email: $("#em").value.trim(), password: $("#pw").value });
+    if (error) $("#lerr").textContent = error.message; else boot();
+  };
+}
+async function logout() { await sb.auth.signOut(); location.reload(); }
+function shell() {
+  $("#app").innerHTML = `<header><div><h1>${esc(BNAME)}</h1><small>Kitchen Desk</small></div><button class="btn ghost" onclick="logout()">Sign out</button></header>
+  <main id="view"></main>
+  <nav>${[["home", "Today"], ["chats", "Chats"], ["orders", "Orders"], ["leads", "Leads"], ["settings", "Settings"]]
+    .map(([k, l]) => `<button data-t="${k}">${l}</button>`).join("")}</nav>`;
+  document.querySelectorAll("nav button").forEach((b) => (b.onclick = () => show(b.dataset.t)));
+}
+function show(t) {
+  tab = t; clearInterval(timer);
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
+  ({ home, chats, orders, leads, settings }[t])();
+}
+const view = () => $("#view");
+const fail = (e) => { view().innerHTML = `<div class="card err">Could not load: ${esc(e.message || e)}</div>`; };
+
+// ---------- Today ----------
+async function home() {
+  view().innerHTML = `<div class="empty">Loading…</div>`;
+  const [o, l, c, s] = await Promise.all([
+    sb.from("orders").select("status,total").eq("business_id", BID),
+    sb.from("leads").select("status").eq("business_id", BID),
+    sb.from("conversations").select("status,last_message_at").eq("business_id", BID),
+    sb.from("business_settings").select("ai_enabled").eq("business_id", BID).single(),
+  ]);
+  if (o.error || l.error || c.error || s.error) return fail(o.error || l.error || c.error || s.error);
+  const pending = o.data.filter((x) => x.status === "pending").length;
+  const done = o.data.filter((x) => x.status === "completed");
+  const active = c.data.filter((x) => Date.now() - new Date(x.last_message_at) < 864e5).length;
+  const waiting = c.data.filter((x) => x.status === "human").length;
+  const booked = o.data.filter((x) => x.status !== "cancelled").reduce((a, x) => a + Number(x.total), 0);
+  view().innerHTML = `
+  <div class="card row"><div><b>AI assistant</b><div class="mute">${s.data.ai_enabled ? "Answering customers" : "Paused: staff answer everything"}</div></div>
+    <button class="btn ${s.data.ai_enabled ? "ghost" : "red"}" id="aiT">${s.data.ai_enabled ? "Pause AI" : "Turn on AI"}</button></div>
+  <div class="grid">
+    <div class="stat hot"><b>${pending}</b><span>Orders to confirm</span></div>
+    <div class="stat ${waiting ? "hot" : ""}"><b>${waiting}</b><span>Chats waiting for staff</span></div>
+    <div class="stat"><b>${active}</b><span>Customers active (24h)</span></div>
+    <div class="stat"><b>${l.data.filter((x) => x.status === "new").length}</b><span>New leads</span></div>
+    <div class="stat"><b>${done.length}</b><span>Completed orders</span></div>
+    <div class="stat"><b>${money(booked)}</b><span>Order value (not cancelled)</span></div>
+  </div>`;
+  $("#aiT").onclick = async () => {
+    await sb.from("business_settings").update({ ai_enabled: !s.data.ai_enabled }).eq("business_id", BID); home();
+  };
+}
+
+// ---------- Chats ----------
+async function chats() {
+  view().innerHTML = `<h2>Chats</h2><div id="cl"><div class="empty">Loading…</div></div>`;
+  const { data, error } = await sb.from("conversations")
+    .select("id,status,handoff_reason,last_message_at,customers(name,phone)")
+    .eq("business_id", BID).order("last_message_at", { ascending: false }).limit(60);
+  if (error) return fail(error);
+  if (!data.length) { $("#cl").innerHTML = `<div class="empty">No chats yet. They appear here when a customer messages your WhatsApp number.</div>`; return; }
+  $("#cl").innerHTML = data.map((c) => `<div class="card" data-id="${c.id}" style="cursor:pointer">
+    <div class="row"><b>${esc(c.customers?.name || c.customers?.phone)}</b><span class="pill ${c.status}">${c.status === "human" ? "needs staff" : c.status}</span></div>
+    <div class="mute">${esc(c.customers?.phone)} · ${when(c.last_message_at)}</div>
+    ${c.handoff_reason ? `<div class="mute">Reason: ${esc(c.handoff_reason)}</div>` : ""}</div>`).join("");
+  document.querySelectorAll("[data-id]").forEach((el) => (el.onclick = () => thread(el.dataset.id)));
+}
+async function thread(id) {
+  clearInterval(timer);
+  const draw = async (keepBox) => {
+    const [{ data: c }, { data: m }] = await Promise.all([
+      sb.from("conversations").select("id,status,handoff_reason,customers(name,phone)").eq("id", id).single(),
+      sb.from("messages").select("sender,body,created_at").eq("conversation_id", id).order("created_at").limit(300),
+    ]);
+    const box = $("#rb")?.value ?? "";
+    view().innerHTML = `<button class="btn ghost" id="back">Back</button>
+    <div class="card" style="margin-top:10px"><div class="row"><b>${esc(c.customers?.name || c.customers?.phone)}</b><span class="pill ${c.status}">${c.status === "human" ? "staff in control" : c.status}</span></div>
+    <div class="mute">${esc(c.customers?.phone)}</div>
+    <div class="bubbles" id="bb">${m.map((x) => `<div class="b ${x.sender}">${esc(x.body)}<small>${x.sender === "ai" ? "AI" : x.sender === "staff" ? "Staff" : "Customer"} · ${when(x.created_at)}</small></div>`).join("")}</div>
+    <div class="row" style="margin-bottom:8px">
+      ${c.status !== "human" ? `<button class="btn red" data-s="human">Take over from AI</button>` : `<button class="btn ghost" data-s="ai">Hand back to AI</button>`}
+      <button class="btn ghost" data-s="closed">Close chat</button></div>
+    ${c.status === "human" ? `<textarea id="rb" placeholder="Type your reply to the customer"></textarea><p class="err" id="re"></p><button class="btn" id="send">Send on WhatsApp</button>` : `<p class="mute">Take over to reply yourself. The AI stops answering while staff are in control.</p>`}</div>`;
+    if (keepBox && $("#rb")) $("#rb").value = box;
+    const bb = $("#bb"); bb.scrollTop = bb.scrollHeight;
+    $("#back").onclick = () => show("chats");
+    document.querySelectorAll("[data-s]").forEach((b) => (b.onclick = async () => {
+      await sb.from("conversations").update({ status: b.dataset.s }).eq("id", id); draw();
+    }));
+    if ($("#send")) $("#send").onclick = async () => {
+      const text = $("#rb").value.trim(); if (!text) return;
+      $("#send").disabled = true;
+      const { data, error } = await sb.functions.invoke("send-staff-message", { body: { conversation_id: id, text } });
+      if (error || data?.error) { $("#re").textContent = data?.error || error.message; $("#send").disabled = false; }
+      else draw();
+    };
+  };
+  await draw();
+  timer = setInterval(() => { if (document.activeElement?.id !== "rb") draw(true); }, 8000);
+}
+
+// ---------- Orders ----------
+async function orders() {
+  view().innerHTML = `<h2>Orders</h2><div id="ol"><div class="empty">Loading…</div></div>`;
+  const { data, error } = await sb.from("orders").select("*,order_items(*)")
+    .eq("business_id", BID).order("created_at", { ascending: false }).limit(60);
+  if (error) return fail(error);
+  if (!data.length) { $("#ol").innerHTML = `<div class="empty">No orders yet. Confirmed customer orders show up here.</div>`; return; }
+  $("#ol").innerHTML = data.map((o) => `<div class="card ticket ${o.status}">
+    <div class="row"><b>#${o.id.slice(0, 8).toUpperCase()} · ${esc(o.customer_name)}</b><b>${money(o.total)}</b></div>
+    <div class="mute">${esc(o.phone)} · ${when(o.created_at)}</div>
+    <div style="margin:6px 0">${o.order_items.map((i) => `${i.quantity} × ${esc(i.name)}${i.notes ? ` <span class="mute">(${esc(i.notes)})</span>` : ""}`).join("<br>")}</div>
+    <div class="mute">${o.fulfillment === "delivery" ? `Delivery to ${esc(o.delivery_location)} (fee ${money(o.delivery_fee)})` : "Pickup"}${o.delivery_time ? ` · ${esc(o.delivery_time)}` : ""}<br>
+    Payment: ${esc(o.payment_method || "not given")}${o.special_instructions ? `<br>Note: ${esc(o.special_instructions)}` : ""}</div>
+    <select data-o="${o.id}" style="margin-top:8px">${ORDER_STATUS.map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${label(s)}</option>`).join("")}</select></div>`).join("");
+  document.querySelectorAll("[data-o]").forEach((el) => (el.onchange = async () => {
+    const { error } = await sb.from("orders").update({ status: el.value }).eq("id", el.dataset.o);
+    if (error) alert(error.message); else orders();
+  }));
+}
+
+// ---------- Leads ----------
+async function leads() {
+  view().innerHTML = `<h2>Leads</h2><div id="ll"><div class="empty">Loading…</div></div>`;
+  const { data, error } = await sb.from("leads").select("*").eq("business_id", BID).order("created_at", { ascending: false }).limit(80);
+  if (error) return fail(error);
+  if (!data.length) { $("#ll").innerHTML = `<div class="empty">No leads yet. People who ask questions but don't order are saved here.</div>`; return; }
+  $("#ll").innerHTML = data.map((x) => `<div class="card">
+    <div class="row"><b>${esc(x.name || x.phone)}</b><span class="mute">${when(x.created_at)}</span></div>
+    <div class="mute">${esc(x.phone)}</div><div style="margin:4px 0">${esc(x.interest || "")}</div>
+    <select data-l="${x.id}">${["new", "contacted", "converted", "lost"].map((s) => `<option ${s === x.status ? "selected" : ""}>${s}</option>`).join("")}</select></div>`).join("");
+  document.querySelectorAll("[data-l]").forEach((el) => (el.onchange = async () => {
+    await sb.from("leads").update({ status: el.value, follow_up_status: el.value === "new" || el.value === "contacted" ? "pending" : "done" }).eq("id", el.dataset.l);
+  }));
+}
+
+// ---------- Settings + business knowledge ----------
+const TEXT_FIELDS = [["opening_hours", "Opening hours"], ["delivery_info", "Delivery information"], ["payment_info", "Payment information"], ["contact_info", "Contact information"], ["ordering_rules", "Ordering rules"], ["ai_instructions", "Extra instructions for the AI"], ["handoff_message", "Message when handing over to staff"]];
+async function settings() {
+  view().innerHTML = `<h2>Settings</h2><div id="sf"><div class="empty">Loading…</div></div><div id="ed"></div>`;
+  const { data: s, error } = await sb.from("business_settings").select("*").eq("business_id", BID).single();
+  if (error) return fail(error);
+  $("#sf").innerHTML = `<div class="card"><label class="chk"><input type="checkbox" id="aiOn" ${s.ai_enabled ? "checked" : ""}> AI assistant answers customers</label>
+    ${TEXT_FIELDS.map(([k, l]) => `<label>${l}<textarea data-f="${k}">${esc(s[k])}</textarea></label>`).join("")}
+    <p class="err" id="se"></p><button class="btn red" id="ss">Save settings</button></div>`;
+  $("#ss").onclick = async () => {
+    const p = { ai_enabled: $("#aiOn").checked, updated_at: new Date().toISOString() };
+    document.querySelectorAll("[data-f]").forEach((el) => (p[el.dataset.f] = el.value));
+    const { error } = await sb.from("business_settings").update(p).eq("business_id", BID);
+    $("#se").textContent = error ? error.message : "Saved."; $("#se").style.color = error ? "" : "var(--leaf)";
+  };
+  $("#ed").innerHTML = `<h3>Menu and add-ons</h3><div id="e1"></div><h3>Delivery areas and fees</h3><div id="e2"></div><h3>FAQs</h3><div id="e3"></div>`;
+  editor("#e1", "menu_items", [{ k: "category", l: "Category" }, { k: "name", l: "Name" }, { k: "description", l: "Description", area: 1 }, { k: "price", l: "Price", num: 1 }, { k: "available", l: "Available today", chk: 1 }], { category: "Main", available: true, price: 0 }, "category");
+  editor("#e2", "delivery_zones", [{ k: "area", l: "Area (as customers write it)" }, { k: "fee", l: "Delivery fee", num: 1 }, { k: "notes", l: "Notes" }], { fee: 0 }, "area");
+  editor("#e3", "knowledge_base", [{ k: "question", l: "Question" }, { k: "answer", l: "Answer", area: 1 }], {}, "created_at");
+}
+async function editor(sel, table, cols, blank, order) {
+  const host = $(sel);
+  const { data, error } = await sb.from(table).select("*").eq("business_id", BID).order(order);
+  if (error) { host.innerHTML = `<div class="err">${esc(error.message)}</div>`; return; }
+  host.innerHTML = "";
+  [...data, { ...blank, _new: true }].forEach((r) => {
+    const d = document.createElement("div"); d.className = "card";
+    d.innerHTML = cols.map((c) => c.chk
+      ? `<label class="chk"><input type="checkbox" data-k="${c.k}" ${r[c.k] ? "checked" : ""}> ${c.l}</label>`
+      : `<label>${c.l}${c.area ? `<textarea data-k="${c.k}">${esc(r[c.k])}</textarea>` : `<input data-k="${c.k}" ${c.num ? 'type="number" step="0.01" inputmode="decimal"' : ""} value="${esc(r[c.k])}">`}</label>`).join("")
+      + `<p class="err"></p><div class="row" style="margin-top:8px"><button class="btn">${r._new ? "Add" : "Save"}</button>${r._new ? "" : `<button class="btn ghost">Delete</button>`}</div>`;
+    const [save, del] = d.querySelectorAll("button"), msg = d.querySelector(".err");
+    save.onclick = async () => {
+      const p = {};
+      d.querySelectorAll("[data-k]").forEach((el) => { p[el.dataset.k] = el.type === "checkbox" ? el.checked : el.type === "number" ? parseFloat(el.value) : el.value; });
+      const res = r._new ? await sb.from(table).insert({ ...p, business_id: BID }) : await sb.from(table).update(p).eq("id", r.id);
+      if (res.error) msg.textContent = res.error.message; else editor(sel, table, cols, blank, order);
+    };
+    if (del) del.onclick = async () => { if (confirm("Delete this entry?")) { await sb.from(table).delete().eq("id", r.id); editor(sel, table, cols, blank, order); } };
+    host.appendChild(d);
+  });
+}
+
+boot();
+</script>
+</body>
+  </html>
+  
